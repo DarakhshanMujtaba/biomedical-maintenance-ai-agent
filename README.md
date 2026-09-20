@@ -224,8 +224,41 @@ branch actually fired on each run.
 
 ## Demo
 
-> _Add a screen recording or screenshots here — e.g. a GIF of the full pipeline running,
-> the approval email arriving, and the final report/notification being sent._
+**Monthly maintenance report**, sorted by urgency (Overdue → Due → OK):
+
+![Monthly maintenance report](screenshots/01-monthly-maintenance-report.png)
+
+**The full n8n automation workflow** — weekly cron trigger → 5-agent pipeline → human
+approval gate → real send or safe no-op:
+
+![Full n8n workflow canvas](screenshots/07-full-n8n-workflow-canvas.png)
+
+**The `/ask` endpoint returning every agent's output**, not just the final one — this is
+what feeds the approval email's content:
+
+![API full pipeline response](screenshots/05-api-full-pipeline-response.png)
+
+**The human-approval email itself**, with real Approve/Decline buttons wired to n8n's
+webhook resume mechanism:
+
+![Approval gate node config](screenshots/04-approval-gate-node-config.png)
+
+**The real notification**, sent only after clicking Approve:
+
+![Approved notification sent](screenshots/06-approved-notification-sent.png)
+
+**Proof the reject path is actually safe** — n8n's own execution history showing the
+`false` branch fired and the real send never happened:
+
+![Decline path execution proof](screenshots/08-decline-path-execution-proof.png)
+
+<details>
+<summary>More screenshots (n8n running locally, SMTP verification)</summary>
+
+![n8n running locally](screenshots/02-n8n-running-locally.png)
+![SMTP test email delivered](screenshots/03-smtp-test-email-delivered.png)
+
+</details>
 
 ## Known limitations & roadmap
 
