@@ -1,0 +1,17 @@
+crewai
+crewai-tools
+groq
+fastapi
+uvicorn
+python-dotenv
+fpdf2
+ics
+crewai
+crewai-tools
+groq
+fastapi
+uvicorn
+python-dotenv
+fpdf2
+ics
+litellm
