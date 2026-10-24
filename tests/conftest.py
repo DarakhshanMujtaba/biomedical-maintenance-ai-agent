@@ -11,12 +11,15 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "tools"))
+for folder in (ROOT, ROOT / "tools", ROOT / "agents", ROOT / "data"):
+    sys.path.insert(0, str(folder))
 
 import calendar_tool
 import notification_tool
+import pdf_tool
 import scheduling_tool
 import sql_tool
+from api import approvals
 
 TODAY = date(2026, 10, 24)   # fixed "today" so results never depend on the real date
 
@@ -67,5 +70,10 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(scheduling_tool, "REPORTS_DIR", reports)
     monkeypatch.setattr(scheduling_tool, "LATEST_SCHEDULE_PATH", reports / "latest_schedule.json")
     monkeypatch.setattr(notification_tool, "LATEST_DRAFT_PATH", reports / "latest_email_draft.json")
+    monkeypatch.setattr(pdf_tool, "REPORTS_DIR", reports)
+    monkeypatch.setattr(approvals, "REPORTS_DIR", reports)
+    # Never use real e-mail settings from .env in tests
+    for var in ("SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM", "TEAM_EMAILS"):
+        monkeypatch.delenv(var, raising=False)
     scheduling_tool.clear_schedule_cache()
     return tmp_path

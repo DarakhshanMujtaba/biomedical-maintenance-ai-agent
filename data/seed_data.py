@@ -5,18 +5,27 @@ from datetime import date, timedelta
 
 sys.path.append(str(Path(__file__).parent.parent / "tools"))
 
-from sql_tool import compute_status   # same Overdue/Due/OK rule used everywhere else
+from sql_tool import compute_status, MAINTENANCE_INTERVALS   # same rules used everywhere else
 
 DB_PATH = Path(__file__).parent / "equipment.db"
 
-MAINTENANCE_INTERVALS = {
-    "Ventilator": 90,
-    "Infusion Pump": 60,
-    "Monitor": 180,
-    "Defibrillator": 120,
-}
+# (name, type, ward, criticality, usage_hours, install_date, days_since_last_service, asset_code)
+# The PM-2024-xxx rows are the RFID-tagged patient monitors from the RFID dashboard,
+# linked by asset_code. Their ward is their home room there. Demo data (not real records):
+# some are High criticality and some overdue on purpose, so the priority list has content.
+RFID_MONITORS = [
+    ("PM-2024-001", "Monitor", "Ward A", "High",   5200, "2023-02-01", 192, "PM-2024-001"),  # overdue 12 d
+    ("PM-2024-002", "Monitor", "Ward A", "Medium", 4100, "2023-02-01", 170, "PM-2024-002"),  # due in 10 d
+    ("PM-2024-003", "Monitor", "Ward A", "Medium", 3000, "2023-05-01",  90, "PM-2024-003"),  # OK
+    ("PM-2024-004", "Monitor", "Ward A", "Low",    2600, "2023-05-01", 185, "PM-2024-004"),  # overdue 5 d
+    ("PM-2024-005", "Monitor", "Ward A", "High",   4800, "2023-06-01", 178, "PM-2024-005"),  # due in 2 d
+    ("PM-2024-006", "Monitor", "Ward B", "High",   6100, "2022-11-01", 200, "PM-2024-006"),  # overdue 20 d
+    ("PM-2024-007", "Monitor", "Ward B", "Medium", 2200, "2023-08-01",  30, "PM-2024-007"),  # OK
+    ("PM-2024-008", "Monitor", "Ward B", "High",   3900, "2023-03-01", 165, "PM-2024-008"),  # due in 15 d
+    ("PM-2024-009", "Monitor", "Ward B", "Medium", 3500, "2023-03-01", 186, "PM-2024-009"),  # overdue 6 d
+    ("PM-2024-010", "Monitor", "Ward B", "Low",    1800, "2023-09-01", 120, "PM-2024-010"),  # OK
+]
 
-# (name, type, ward, criticality, usage_hours, install_date, days_since_last_service)
 EQUIPMENT = [
     ("Ventilator-01", "Ventilator", "ICU", "High", 4200, "2022-05-10", 95),
     ("Ventilator-02", "Ventilator", "OT", "High", 3100, "2023-01-20", 70),
@@ -52,20 +61,23 @@ def seed():
     conn.execute("PRAGMA foreign_keys = ON;")
     cur = conn.cursor()
 
-    # Clear existing rows first so re-running this script during development is safe
+    # Clear existing rows first so re-running this script during development is safe.
+    # The approvals log is kept on purpose (it is an audit trail).
+    cur.execute("DELETE FROM service_events;")
     cur.execute("DELETE FROM maintenance_logs;")
     cur.execute("DELETE FROM equipment;")
     cur.execute("DELETE FROM engineers;")
     # Restart ids at 1 so demos and tests that use fixed ids keep working after re-seeding
-    cur.execute("DELETE FROM sqlite_sequence WHERE name IN ('equipment', 'maintenance_logs', 'engineers');")
+    cur.execute("DELETE FROM sqlite_sequence WHERE name IN ('equipment', 'maintenance_logs', 'engineers', 'service_events');")
 
-    for name, etype, ward, criticality, usage_hours, install_date, days_since_service in EQUIPMENT:
+    rows = [row + (None,) for row in EQUIPMENT] + RFID_MONITORS
+    for name, etype, ward, criticality, usage_hours, install_date, days_since_service, asset_code in rows:
         cur.execute(
             """
-            INSERT INTO equipment (name, type, ward, criticality, usage_hours, install_date)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO equipment (name, type, ward, criticality, usage_hours, install_date, asset_code)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (name, etype, ward, criticality, usage_hours, install_date),
+            (name, etype, ward, criticality, usage_hours, install_date, asset_code),
         )
         equipment_id = cur.lastrowid
 
@@ -90,7 +102,8 @@ def seed():
 
     conn.commit()
     conn.close()
-    print(f"Seeded {len(EQUIPMENT)} equipment, {len(EQUIPMENT)} maintenance logs, {len(ENGINEERS)} engineers.")
+    print(f"Seeded {len(rows)} equipment ({len(RFID_MONITORS)} RFID-tagged monitors), "
+          f"{len(rows)} maintenance logs, {len(ENGINEERS)} engineers.")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 import json
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sql_tool import get_equipment_needing_maintenance
@@ -31,8 +33,12 @@ def draft_team_notification(top_n=5, ward=None, within_days=30):
     ]
 
     draft = draft_maintenance_email(email_items, unscheduled_overdue_count)
+    # A unique id per draft: an approval must name the exact draft it approves,
+    # and the same draft can be decided (and sent) only once.
+    draft["draft_id"] = uuid.uuid4().hex
+    draft["created_at"] = datetime.now(timezone.utc).isoformat()
 
-    # The exact text a human approves and n8n sends (not the LLM's re-wording of it)
+    # The exact text a human approves and n8n / the dashboard sends (not the LLM's re-wording)
     LATEST_DRAFT_PATH.parent.mkdir(parents=True, exist_ok=True)
     LATEST_DRAFT_PATH.write_text(json.dumps(draft, indent=2, ensure_ascii=False))
 

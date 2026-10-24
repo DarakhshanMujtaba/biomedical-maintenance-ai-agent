@@ -6,6 +6,14 @@ DB_PATH = Path(__file__).parent.parent / "data" / "equipment.db"
 
 DUE_SOON_WINDOW_DAYS = 30
 
+# Days between preventive maintenance visits, per equipment type
+MAINTENANCE_INTERVALS = {
+    "Ventilator": 90,
+    "Infusion Pump": 60,
+    "Monitor": 180,
+    "Defibrillator": 120,
+}
+
 
 def today():
     """Single place that decides "today" (tests replace it to simulate later dates)."""
@@ -51,7 +59,7 @@ def get_equipment_needing_maintenance(ward=None, within_days=30):
 
     query = """
         SELECT equipment.id, equipment.name, equipment.type, equipment.ward,
-               equipment.criticality, equipment.usage_hours,
+               equipment.criticality, equipment.usage_hours, equipment.asset_code,
                maintenance_logs.last_service_date, maintenance_logs.next_due_date,
                maintenance_logs.status
         FROM equipment
@@ -80,7 +88,7 @@ def get_equipment_by_ids(equipment_ids):
     placeholders = ",".join("?" for _ in equipment_ids)
     query = f"""
         SELECT equipment.id, equipment.name, equipment.type, equipment.ward,
-               equipment.criticality, equipment.usage_hours,
+               equipment.criticality, equipment.usage_hours, equipment.asset_code,
                maintenance_logs.last_service_date, maintenance_logs.next_due_date,
                maintenance_logs.status
         FROM equipment
@@ -130,7 +138,7 @@ def get_all_equipment_with_status():
 
     cur.execute("""
         SELECT equipment.id, equipment.name, equipment.type, equipment.ward,
-               equipment.criticality, equipment.usage_hours, equipment.install_date,
+               equipment.criticality, equipment.usage_hours, equipment.install_date, equipment.asset_code,
                maintenance_logs.last_service_date, maintenance_logs.next_due_date,
                maintenance_logs.status
         FROM equipment
@@ -140,6 +148,41 @@ def get_all_equipment_with_status():
     rows = cur.fetchall()
     conn.close()
     return with_live_status(rows)
+
+
+def mark_serviced(equipment_id, serviced_by, serviced_on=None):
+    """Record that a device was serviced: last service = serviced_on (default today),
+    next due = serviced_on + the type's interval. Logged in service_events.
+    Returns the updated device, or None if the id does not exist."""
+    serviced_on = serviced_on or today()
+    conn = get_connection()
+    try:
+        row = conn.execute("""
+            SELECT equipment.id, equipment.type, maintenance_logs.next_due_date
+            FROM equipment JOIN maintenance_logs ON maintenance_logs.equipment_id = equipment.id
+            WHERE equipment.id = ?""", (equipment_id,)).fetchone()
+        if row is None:
+            return None
+
+        new_due = serviced_on + timedelta(days=MAINTENANCE_INTERVALS[row["type"]])
+        conn.execute(
+            "UPDATE maintenance_logs SET last_service_date = ?, next_due_date = ?, status = ? WHERE equipment_id = ?",
+            (serviced_on.isoformat(), new_due.isoformat(), compute_status(new_due, serviced_on), equipment_id))
+        conn.execute(
+            """INSERT INTO service_events (equipment_id, serviced_on, serviced_by, previous_due_date, new_due_date, recorded_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))""",
+            (equipment_id, serviced_on.isoformat(), serviced_by, row["next_due_date"], new_due.isoformat()))
+        conn.commit()
+    finally:
+        conn.close()
+    return get_equipment_by_ids([equipment_id])[0]
+
+
+def get_equipment_by_asset_code(asset_code):
+    conn = get_connection()
+    row = conn.execute("SELECT id FROM equipment WHERE asset_code = ?", (asset_code,)).fetchone()
+    conn.close()
+    return get_equipment_by_ids([row["id"]])[0] if row else None
 
 
 if __name__ == "__main__":

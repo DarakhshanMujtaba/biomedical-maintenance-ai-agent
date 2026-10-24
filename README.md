@@ -222,6 +222,27 @@ Password works well — no OAuth app registration needed), and either run it man
 activate it for the weekly schedule.
 </details>
 
+## Dashboard integration (RFID FYP dashboard)
+
+The RFID dashboard's **🔧 Maintenance** page uses these fast endpoints (no LLM). Keep the API on
+`127.0.0.1` — only the dashboard's server calls it.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Running? E-mail configured? |
+| `GET /equipment` | All devices, live status, priority score, `asset_code` (link to RFID) |
+| `GET /priorities?ward=&within_days=` | Devices needing maintenance, ranked |
+| `POST /drafts` | Schedule + e-mail draft + PDF (nothing sent) |
+| `GET /drafts/latest` | Latest draft, its schedule and its decision |
+| `POST /drafts/{draft_id}/decision` | `approved` → sends exactly that draft once; `declined` → sends nothing |
+| `GET /approvals` | Approval log (who, when, sent to) |
+| `POST /equipment/{id}/serviced` | Mark serviced today; next due date moves forward; logged |
+| `GET /report` | Monthly PDF |
+
+Sending happens only in `api/approvals.py` (not in `tools/`, so no agent can call it). To enable it,
+copy `.env.example` to `.env` and fill in a Gmail **App Password** and `TEAM_EMAILS`.
+The 10 `PM-2024-xxx` monitors in the seed data are the RFID-tagged demo devices (demo dates).
+
 ## Human approval, concretely
 
 The n8n workflow: **Schedule Trigger → HTTP Request (`/ask`) → Send email & wait for
