@@ -4,4 +4,4 @@ __pycache__/
 *.pyc
 data/*.db
 reports/
-.n8n/
+.n8n/.pytest_cache/

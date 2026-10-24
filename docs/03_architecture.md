@@ -27,10 +27,8 @@ flowchart TD
     DRAFT --> H{Human Approval Gate - n8n}
     ICS --> H
     H -- approved --> X1[n8n sends email via Gmail node]
-    H -- approved --> X2[n8n saves .ics / creates event]
-    H -- rejected --> LOG[Log + notify agent to revise]
+    H -- declined --> LOG[No Operation: nothing is sent]
 
-    PDF --> X3[n8n emails report / saves to Drive folder]
 ```
 
 ## 2. Component Breakdown
@@ -39,7 +37,7 @@ flowchart TD
 | Agent | Role | Tools It Uses |
 |---|---|---|
 | **Equipment Monitor Agent** | Finds equipment due/overdue for maintenance, filters by ward/criticality | SQL Tool |
-| **Prioritization Agent** | Scores and ranks equipment by risk (overdue days × criticality × usage hours) | SQL Tool |
+| **Prioritization Agent** | Scores and ranks equipment by risk: `max(0, overdue_days)*10 + criticality_weight*20 + min(usage_hours/100, 15)` (High=3, Medium=2, Low=1; usage is capped so it can never flip a criticality tier) | SQL Tool |
 | **Scheduling Agent** | Proposes maintenance slots and engineer assignments | Calendar Tool, SQL Tool |
 | **Reporting Agent** | Builds the monthly/weekly maintenance report | SQL Tool, PDF Tool |
 | **Notification Agent** | Drafts the email to the biomedical team (does NOT send it) | Email Draft Tool |
@@ -61,7 +59,7 @@ These are wired together as a **CrewAI Crew** with sequential/hierarchical tasks
 
 ### Automation Layer — n8n workflows (`n8n/`)
 1. **Trigger workflow** — Cron (e.g. every Monday 8AM) OR manual webhook — calls the FastAPI `/ask` endpoint.
-2. **Human approval workflow** — receives the agent's draft (email/schedule), sends it to Darakhshan via email/Telegram with an Approve/Reject link (n8n "Wait for Webhook" node), pauses until she responds.
+2. **Human approval workflow** — receives the agent's draft (email/schedule), e-mails the exact tool-built draft (`email_draft` from `/ask`) to the approver with Approve/Decline buttons (n8n "Send and Wait for Response"), and pauses until they respond. Approve → the same text is sent to the team. Decline → No Operation, nothing is sent. The .ics file and PDF stay in `reports/` (not sent yet).
 3. **Execution workflow** — on approval, sends the real email (Gmail node) and/or saves the `.ics` file; on rejection, logs it and stops.
 
 ### API Layer — FastAPI (`api/main.py`)
@@ -74,13 +72,13 @@ These are wired together as a **CrewAI Crew** with sequential/hierarchical tasks
 1. FastAPI receives the request → CrewAI Crew kicks off.
 2. **Equipment Monitor Agent** → SQL Tool → filters ICU + due-within-30-days.
 3. **Prioritization Agent** → ranks by risk score.
-4. **Scheduling Agent** → picks top 5 → Calendar Tool → produces a draft `.ics` + engineer assignments.
-5. **Notification Agent** → Email Tool → drafts a summary email (not sent yet).
-6. **Reporting Agent** → PDF Tool → builds the monthly report.
-7. FastAPI returns: `{ schedule_draft, email_draft, report_pdf_path }`.
-8. n8n picks this up → sends the drafts to Darakhshan for **approval**.
-9. On approval → n8n sends the real email + saves the calendar file + emails the PDF report.
-10. Everything is logged (who approved, when, what was sent) for auditability.
+4. **Scheduling Agent** → picks top 5 → one device per day for the team, 9 AM local time (Asia/Karachi; same engineer + same day would get 11 AM, 1 PM) → draft `.ics` + engineer assignments. The schedule is computed once per run and reused by step 5.
+5. **Notification Agent** → Email Tool → drafts a summary email from that same schedule (not sent).
+6. **Reporting Agent** → PDF Tool → builds the monthly report (status always computed from `next_due_date`).
+7. FastAPI returns: `{ result, tasks: {monitor, prioritize, schedule, notify, report}, email_draft: {subject, body}, schedule }`.
+8. n8n e-mails `email_draft` to the approver with **Approve / Decline**.
+9. Approve → n8n sends exactly that subject/body to the team. Decline → nothing is sent.
+10. Not yet: sending the `.ics`/PDF as attachments, and an approvals log (planned with the dashboard integration). n8n's execution history currently shows which branch ran.
 
 ## 4. Why This Is "Agentic" (not just a chatbot)
 

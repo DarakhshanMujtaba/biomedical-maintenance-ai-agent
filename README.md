@@ -125,7 +125,7 @@ data/       SQLite schema, seed script, and the database file
 docs/       Planning docs (scope, tech stack, architecture, implementation plan)
 n8n/        Exported n8n workflow(s)
 reports/    Generated PDFs and .ics files (gitignored)
-tests/      Reserved for future test coverage
+tests/      pytest tests (no LLM calls, temporary database)
 ```
 
 ## Getting started
@@ -133,6 +133,7 @@ tests/      Reserved for future test coverage
 ```bash
 python -m venv venv
 venv\Scripts\activate            # Windows
+source venv/bin/activate         # macOS / Linux
 python -m pip install -r requirements.txt
 ```
 
@@ -152,6 +153,14 @@ python data/seed_data.py
 ```
 
 ## Running it
+
+<details>
+<summary><strong>Automated tests</strong> (no LLM calls, never touches data/ or reports/)</summary>
+
+```bash
+python -m pytest -v
+```
+</details>
 
 <details>
 <summary><strong>Individual tools</strong> (each testable standalone, no LLM calls)</summary>
@@ -266,7 +275,8 @@ webhook resume mechanism:
   report); each agent still reasons about *parameters* from the request text, but
   doesn't dynamically skip steps. `Process.hierarchical` with a manager agent would
   close this gap — a planned next step, not yet implemented.
-- `.ics` timestamps are UTC per the standard; no real-world timezone handling.
+- Slot times are local hospital time (default `Asia/Karachi`, change with the
+  `SCHEDULE_TIMEZONE` environment variable); the `.ics` file stores them in UTC as the standard requires.
 - Uses mock/seed data only, by design — no real hospital data is used or required.
 - Gmail sending currently uses SMTP + App Password rather than OAuth2; fine for a demo,
   OAuth would be the production-grade choice.

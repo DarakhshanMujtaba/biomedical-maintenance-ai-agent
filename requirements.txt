@@ -1,17 +1,14 @@
-crewai
-crewai-tools
-groq
-fastapi
-uvicorn
-python-dotenv
-fpdf2
-ics
-crewai
-crewai-tools
-groq
-fastapi
-uvicorn
-python-dotenv
-fpdf2
-ics
-litellm
+# Versions pinned to the set verified working together (Python 3.12, 2026-10-24).
+crewai==1.15.28
+crewai-tools==1.15.28
+groq==1.7.0
+litellm==1.106.2
+fastapi==0.161.1
+uvicorn==0.54.0
+python-dotenv==1.2.4
+fpdf2==2.8.9
+ics==0.7.3
+tzdata==2026.5        # time-zone data; Windows has none built in (needed for Asia/Karachi)
+
+# Tests
+pytest==9.1.1

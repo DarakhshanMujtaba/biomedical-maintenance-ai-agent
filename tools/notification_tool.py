@@ -1,9 +1,15 @@
+import json
+from pathlib import Path
+
 from sql_tool import get_equipment_needing_maintenance
 from scheduling_tool import propose_maintenance_schedule
 from email_tool import draft_maintenance_email
 
+LATEST_DRAFT_PATH = Path(__file__).parent.parent / "reports" / "latest_email_draft.json"
+
 
 def draft_team_notification(top_n=5, ward=None, within_days=30):
+    # Reuses the schedule already computed in this run (no second .ics, same dates/times)
     schedule_result = propose_maintenance_schedule(top_n=top_n, ward=ward, within_days=within_days)
     scheduled = schedule_result["scheduled"]
 
@@ -19,12 +25,17 @@ def draft_team_notification(top_n=5, ward=None, within_days=30):
             "equipment_name": item["equipment_name"],
             "ward": item["ward"],
             "engineer_name": item["engineer_name"],
-            "scheduled_date": item["proposed_date"],
+            "scheduled_date": item["proposed_slot"],
         }
         for item in scheduled
     ]
 
     draft = draft_maintenance_email(email_items, unscheduled_overdue_count)
+
+    # The exact text a human approves and n8n sends (not the LLM's re-wording of it)
+    LATEST_DRAFT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LATEST_DRAFT_PATH.write_text(json.dumps(draft, indent=2, ensure_ascii=False))
+
     return {"draft": draft, "scheduled_count": len(scheduled), "unassigned": schedule_result["unassigned"]}
 
 

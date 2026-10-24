@@ -1,4 +1,7 @@
 def draft_maintenance_email(scheduled_items, unscheduled_overdue_count):
+    """Builds the e-mail text only. It never sends anything: sending happens in n8n
+    (or the dashboard) after a human clicks Approve.
+    The body is the exact text the team receives, so it must not say "draft"."""
     subject = f"Maintenance Schedule Update — {len(scheduled_items)} device(s) scheduled"
 
     lines = ["Hi team,", "", "The following equipment has been scheduled for maintenance:", ""]
@@ -20,7 +23,7 @@ def draft_maintenance_email(scheduled_items, unscheduled_overdue_count):
         lines.append("No other overdue devices remain outstanding at this time.")
 
     lines.append("")
-    lines.append("This is an automated draft. Please review before sending.")
+    lines.append("Biomedical Engineering Department")
 
     body = "\n".join(lines)
 
@@ -29,9 +32,9 @@ def draft_maintenance_email(scheduled_items, unscheduled_overdue_count):
 
 if __name__ == "__main__":
     sample_scheduled = [
-        {"equipment_name": "Ventilator-01", "ward": "ICU", "engineer_name": "Ayesha Khan", "scheduled_date": "2026-09-25 09:00"},
-        {"equipment_name": "Ventilator-03", "ward": "General Ward", "engineer_name": "Ayesha Khan", "scheduled_date": "2026-09-25 11:00"},
-        {"equipment_name": "Infusion Pump-01", "ward": "ICU", "engineer_name": "Bilal Ahmed", "scheduled_date": "2026-09-26 09:00"},
+        {"equipment_name": "Ventilator-01", "ward": "ICU", "engineer_name": "Ayesha Khan", "scheduled_date": "2026-09-25 09:00 PKT"},
+        {"equipment_name": "Ventilator-03", "ward": "General Ward", "engineer_name": "Ayesha Khan", "scheduled_date": "2026-09-25 11:00 PKT"},
+        {"equipment_name": "Infusion Pump-01", "ward": "ICU", "engineer_name": "Bilal Ahmed", "scheduled_date": "2026-09-26 09:00 PKT"},
     ]
     draft = draft_maintenance_email(sample_scheduled, unscheduled_overdue_count=2)
     print("SUBJECT:", draft["subject"])

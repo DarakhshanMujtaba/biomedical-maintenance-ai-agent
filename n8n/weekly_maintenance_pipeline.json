@@ -50,7 +50,7 @@
         "fromEmail": "sender@example.com",
         "toEmail": "approver@example.com",
         "subject": "Approval needed: Weekly Maintenance Notification",
-        "message": "={{ $json.tasks.notify }}\n",
+        "message": "={{ $json.email_draft ? 'Please review the e-mail below. Approve = it is sent to the team. Decline = nothing is sent.\\n\\nSubject: ' + $json.email_draft.subject + '\\n\\n' + $json.email_draft.body : 'WARNING: the agent produced no e-mail draft this run. Please Decline.' }}",
         "approvalOptions": {
           "values": {
             "approvalType": "double"
@@ -93,6 +93,16 @@
                 "operation": "true",
                 "singleValue": true
               }
+            },
+            {
+              "id": "7a1c2e40-0d3b-4c7e-9f1a-2b8d5e6f9a01",
+              "leftValue": "={{ !!$('HTTP Request').item.json.email_draft }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -112,9 +122,9 @@
       "parameters": {
         "fromEmail": "sender@example.com",
         "toEmail": "approver@example.com",
-        "subject": "Biomedical Equipment Maintenance Schedule",
+        "subject": "={{ $('HTTP Request').item.json.email_draft.subject }}",
         "emailFormat": "text",
-        "text": "={{ $('HTTP Request').item.json.tasks.notify }}\n",
+        "text": "={{ $('HTTP Request').item.json.email_draft.body }}",
         "options": {}
       },
       "type": "n8n-nodes-base.emailSend",

@@ -4,6 +4,38 @@ from datetime import date, timedelta
 
 DB_PATH = Path(__file__).parent.parent / "data" / "equipment.db"
 
+DUE_SOON_WINDOW_DAYS = 30
+
+
+def today():
+    """Single place that decides "today" (tests replace it to simulate later dates)."""
+    return date.today()
+
+
+def compute_status(next_due_date, on_date=None):
+    """Overdue / Due / OK, always calculated from next_due_date.
+    The stored maintenance_logs.status is only a snapshot from seeding time and goes
+    stale as days pass, so every read uses this instead."""
+    on_date = on_date or today()
+    if isinstance(next_due_date, str):
+        next_due_date = date.fromisoformat(next_due_date)
+    if next_due_date < on_date:
+        return "Overdue"
+    if next_due_date <= on_date + timedelta(days=DUE_SOON_WINDOW_DAYS):
+        return "Due"
+    return "OK"
+
+
+def with_live_status(rows):
+    """Turn sqlite rows into dicts and replace the stored status with the live one."""
+    result = []
+    for row in rows:
+        item = dict(row)
+        if "next_due_date" in item:
+            item["status"] = compute_status(item["next_due_date"])
+        result.append(item)
+    return result
+
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -13,7 +45,7 @@ def get_connection():
 
 
 def get_equipment_needing_maintenance(ward=None, within_days=30):
-    cutoff_date = (date.today() + timedelta(days=within_days)).isoformat()
+    cutoff_date = (today() + timedelta(days=within_days)).isoformat()
     conn = get_connection()
     cur = conn.cursor()
 
@@ -35,7 +67,7 @@ def get_equipment_needing_maintenance(ward=None, within_days=30):
     cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return with_live_status(rows)
 
 
 def get_equipment_by_ids(equipment_ids):
@@ -58,7 +90,7 @@ def get_equipment_by_ids(equipment_ids):
     cur.execute(query, equipment_ids)
     rows = cur.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return with_live_status(rows)
 
 
 def get_available_engineers(specialty=None):
@@ -75,7 +107,7 @@ def get_available_engineers(specialty=None):
     cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return with_live_status(rows)
 
 def get_engineers_by_ids(engineer_ids):
     if not engineer_ids:
@@ -89,7 +121,7 @@ def get_engineers_by_ids(engineer_ids):
     cur.execute(query, engineer_ids)
     rows = cur.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return with_live_status(rows)
 
 
 def get_all_equipment_with_status():
@@ -107,7 +139,7 @@ def get_all_equipment_with_status():
     """)
     rows = cur.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return with_live_status(rows)
 
 
 if __name__ == "__main__":

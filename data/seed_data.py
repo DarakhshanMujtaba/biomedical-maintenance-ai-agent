@@ -1,6 +1,11 @@
 import sqlite3
+import sys
 from pathlib import Path
 from datetime import date, timedelta
+
+sys.path.append(str(Path(__file__).parent.parent / "tools"))
+
+from sql_tool import compute_status   # same Overdue/Due/OK rule used everywhere else
 
 DB_PATH = Path(__file__).parent / "equipment.db"
 
@@ -10,8 +15,6 @@ MAINTENANCE_INTERVALS = {
     "Monitor": 180,
     "Defibrillator": 120,
 }
-
-DUE_SOON_WINDOW_DAYS = 30
 
 # (name, type, ward, criticality, usage_hours, install_date, days_since_last_service)
 EQUIPMENT = [
@@ -43,14 +46,6 @@ ENGINEERS = [
 ]
 
 
-def compute_status(next_due_date: date, today: date) -> str:
-    if next_due_date < today:
-        return "Overdue"
-    if next_due_date <= today + timedelta(days=DUE_SOON_WINDOW_DAYS):
-        return "Due"
-    return "OK"
-
-
 def seed():
     today = date.today()
     conn = sqlite3.connect(DB_PATH)
@@ -61,6 +56,8 @@ def seed():
     cur.execute("DELETE FROM maintenance_logs;")
     cur.execute("DELETE FROM equipment;")
     cur.execute("DELETE FROM engineers;")
+    # Restart ids at 1 so demos and tests that use fixed ids keep working after re-seeding
+    cur.execute("DELETE FROM sqlite_sequence WHERE name IN ('equipment', 'maintenance_logs', 'engineers');")
 
     for name, etype, ward, criticality, usage_hours, install_date, days_since_service in EQUIPMENT:
         cur.execute(
